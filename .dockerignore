@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+*.env
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+
+# Django media/static files (generated)
+media/
+static/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node or frontend build folders
+node_modules/
+build/
+dist/
