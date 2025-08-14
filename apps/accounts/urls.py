@@ -13,3 +13,6 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('', include(router.urls)),
 ]
+
+# http://localhost:8000/api/profile/  use to see user profile
+# http://localhost:8000/api/profile/29/ put, patch, delete
