@@ -8,12 +8,20 @@ from rest_framework import viewsets, status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .models import User
-from .serializers import RegistrationSerializer, UserProfileSerializer
+from .serializers import (
+    RegistrationSerializer, 
+    UserProfileSerializer, 
+    PasswordResetRequestSerializer, 
+    PasswordResetConfirmSerializer
+)
 from django.urls import reverse
 from django.shortcuts import redirect
 import jwt
 import datetime
-from .tasks import send_activation_email
+from .tasks import (
+    send_activation_email, 
+    send_password_reset_email
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -151,3 +159,102 @@ class UserProfileViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.error(f"Failed to update user profile for user_id={self.request.user.id}: {str(e)}")
             raise
+
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"status": "error", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            email = serializer.validated_data['email']
+            user = User.objects.get(email=email)
+            
+            # Generate password reset token (expires in 1 hour)
+            expiration_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            token = jwt.encode(
+                {
+                    "user_id": user.id,
+                    "exp": expiration_time,
+                    "type": "password_reset"  # Differentiate from activation token
+                },
+                settings.SECRET_KEY,
+                algorithm="HS256"
+            )
+
+            # Generate reset URL
+            reset_url = request.build_absolute_uri(reverse('password-reset-confirm', args=[token]))
+            logger.info(f"Password reset URL generated for user_id={user.id}: {reset_url}")
+
+            # Send password reset email via Celery
+            try:
+                task = send_password_reset_email.delay(user.id, reset_url, user.email)
+                logger.info(f"Password reset email task queued for user_id={user.id}, task_id={task.id}")
+            except OperationalError as e:
+                logger.error(f"Failed to queue password reset email for user_id={user.id}: {str(e)}")
+                return Response(
+                    {"status": "error", "message": "Failed to connect to email service. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response(
+                {"status": "success", "message": "Password reset link sent to your email."},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f"Error in password reset request for email={email}: {str(e)}")
+            return Response(
+                {"status": "error", "message": "An error occurred while processing your request."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request, token):
+         # Combine URL token with request data
+        data = request.data.copy()
+        data['token'] = token
+        
+        serializer = PasswordResetConfirmSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(
+                {"status": "error", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Verify token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            
+            # Additional token validation
+            if payload.get('type') != 'password_reset':
+                raise jwt.InvalidTokenError("Invalid token type")
+            
+            user = User.objects.get(id=payload['user_id'])
+            
+            # Set new password
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            logger.info(f"Password reset successfully for user_id={user.id}")
+
+            return Response(
+                {"status": "success", "message": "Password has been reset successfully."},
+                status=status.HTTP_200_OK
+            )
+
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"Expired password reset token: {token}")
+            return Response(
+                {"status": "error", "message": "Password reset link has expired."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except (jwt.DecodeError, jwt.InvalidTokenError, User.DoesNotExist) as e:
+            logger.error(f"Invalid password reset token: {token}, error: {str(e)}")
+            return Response(
+                {"status": "error", "message": "Invalid or corrupted password reset link."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
