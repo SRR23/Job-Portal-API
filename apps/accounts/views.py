@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.permissions import IsAuthenticated
 from .models import User
 from .serializers import (
@@ -113,6 +114,40 @@ class ActivateAccountView(APIView):
             )
         
 
+# class LoginView(APIView):
+#     def post(self, request):
+#         email = request.data.get('email')
+#         password = request.data.get('password')
+
+#         user = authenticate(request, email=email, password=password)
+
+#         if user:
+#             if not user.is_active:
+#                 logger.warning(f"Login attempt for inactive account: email={email}")
+#                 return Response(
+#                     {"status": "error", "message": "Account is not activated. Please check your email."},
+#                     status=status.HTTP_403_FORBIDDEN
+#                 )
+
+#             refresh = RefreshToken.for_user(user)
+#             user_data = UserProfileSerializer(user).data
+#             logger.info(f"Successful login for user_id={user.id}, email={email}")
+#             return Response(
+#                 {
+#                     "status": "success",
+#                     "user": user_data,
+#                     "access_token": str(refresh.access_token),
+#                     "refresh_token": str(refresh),
+#                 },
+#                 status=status.HTTP_200_OK
+#             )
+
+#         logger.warning(f"Failed login attempt for email={email}: Invalid credentials")
+#         return Response(
+#             {"status": "error", "message": "Invalid email or password."},
+#             status=status.HTTP_401_UNAUTHORIZED
+#         )
+
 class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -131,21 +166,62 @@ class LoginView(APIView):
             refresh = RefreshToken.for_user(user)
             user_data = UserProfileSerializer(user).data
             logger.info(f"Successful login for user_id={user.id}, email={email}")
-            return Response(
+
+            response = Response(
                 {
                     "status": "success",
                     "user": user_data,
-                    "access_token": str(refresh.access_token),
-                    "refresh_token": str(refresh),
+                    "access_token": str(refresh.access_token),  # frontend will use this
                 },
                 status=status.HTTP_200_OK
             )
+
+            # Store refresh token in HttpOnly cookie
+            response.set_cookie(
+                key="refresh_token",
+                value=str(refresh),
+                httponly=True,
+                secure=False,      # only True for HTTPS in production
+                samesite="Lax",
+                max_age=7 * 24 * 60 * 60  # 7 days
+            )
+
+            return response
 
         logger.warning(f"Failed login attempt for email={email}: Invalid credentials")
         return Response(
             {"status": "error", "message": "Invalid email or password."},
             status=status.HTTP_401_UNAUTHORIZED
         )
+    
+
+class CookieTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response({"error": "Refresh token missing"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = self.get_serializer(data={"refresh": refresh_token})
+        serializer.is_valid(raise_exception=True)
+
+        access = serializer.validated_data["access"]
+
+        return Response({"access_token": access}, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        response = Response(
+            {"status": "success", "message": "Logged out successfully."},
+            status=status.HTTP_200_OK
+        )
+        # Remove refresh cookie
+        response.delete_cookie("refresh_token")
+        return response
+
     
 
 class UserProfileViewSet(viewsets.ModelViewSet):
