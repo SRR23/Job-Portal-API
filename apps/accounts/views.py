@@ -75,6 +75,7 @@ class RegistrationView(APIView):
                 {"status": "error", "message": "An unexpected error occurred during registration."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
 
 class ActivateAccountView(APIView):
     def get(self, request, token):
@@ -110,6 +111,7 @@ class ActivateAccountView(APIView):
                 {"status": "error", "message": "Invalid activation token or user does not exist."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
 
 class LoginView(APIView):
     def post(self, request):
@@ -144,6 +146,7 @@ class LoginView(APIView):
             {"status": "error", "message": "Invalid email or password."},
             status=status.HTTP_401_UNAUTHORIZED
         )
+    
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
