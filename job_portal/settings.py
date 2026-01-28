@@ -148,7 +148,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,              # Set to True if you want old refresh tokens to become invalid after use
     'ALGORITHM': 'HS256',                          # Default signing algorithm
     'SIGNING_KEY': SECRET_KEY,                     # Secret key for token signing
-    'AUTH_HEADER_TYPES': ('Bearer',),              # Header prefix for access tokens
+    'AUTH_HEADER_TYPES': ('JP',),              # Header prefix for access tokens
 }
 
 
