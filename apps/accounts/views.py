@@ -112,41 +112,7 @@ class ActivateAccountView(APIView):
                 {"status": "error", "message": "Invalid activation token or user does not exist."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-
-# class LoginView(APIView):
-#     def post(self, request):
-#         email = request.data.get('email')
-#         password = request.data.get('password')
-
-#         user = authenticate(request, email=email, password=password)
-
-#         if user:
-#             if not user.is_active:
-#                 logger.warning(f"Login attempt for inactive account: email={email}")
-#                 return Response(
-#                     {"status": "error", "message": "Account is not activated. Please check your email."},
-#                     status=status.HTTP_403_FORBIDDEN
-#                 )
-
-#             refresh = RefreshToken.for_user(user)
-#             user_data = UserProfileSerializer(user).data
-#             logger.info(f"Successful login for user_id={user.id}, email={email}")
-#             return Response(
-#                 {
-#                     "status": "success",
-#                     "user": user_data,
-#                     "access_token": str(refresh.access_token),
-#                     "refresh_token": str(refresh),
-#                 },
-#                 status=status.HTTP_200_OK
-#             )
-
-#         logger.warning(f"Failed login attempt for email={email}: Invalid credentials")
-#         return Response(
-#             {"status": "error", "message": "Invalid email or password."},
-#             status=status.HTTP_401_UNAUTHORIZED
-#         )
+    
 
 class LoginView(APIView):
     def post(self, request):
