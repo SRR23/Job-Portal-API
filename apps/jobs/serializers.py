@@ -7,14 +7,14 @@ from cloudinary.uploader import upload  # For manual Cloudinary upload from URL
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'title', 'slug']
+        fields = '_all__'
 
 
 # Tag Serializer
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ['id', 'title', 'slug']
+        fields = '__all__'
 
 
 # Organization Serializer
